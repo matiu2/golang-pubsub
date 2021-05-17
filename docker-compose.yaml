@@ -9,21 +9,11 @@ services:
             MYSQL_DATABASE: pubsub
         ports:
             - "3307:3306"
+        volumes:
+            - ./sql-init:/docker-entrypoint-initdb.d
     pub-sub-emulator:
         image: google/cloud-sdk:latest
         command: >
           bash -c "gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=test"
         ports:
         - "8085:8085"
-    pub-sub-setup:
-        image: google/cloud-sdk:latest
-        environment:
-            - PUBSUB_EMULATOR_HOST=localhost:8085
-            - PUBSUB_PROJECT_ID=test
-        depends_on:
-            - "pub-sub-emulator"
-        entrypoint: ["/bin/bash","-c"]
-        command:
-        - |
-            gcloud alpha pubsub topics create test
-            gcloud alpha pubsub topics list

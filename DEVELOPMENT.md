@@ -21,6 +21,19 @@ To create the testing *mysql* and *pubsub-emulator* docker images:
 
 (see [docker-compose.yaml](docker-compose.yaml) for that configuration)
 
-There's a file included [.env](.env), that lets you connect to these servers. You'll need to modify this for test/prod deployments.
+There's a file included [.env](.env), that lets you connect to these services. You'll need to modify this for test/prod deployments.
 
+### Environment access
 
+#### MySQL
+
+ * To run mysql-commands:
+   docker-compose exec mysql mysql -uroot -proot pubsub
+ * mysql listens no localhost 3307
+
+#### Pubsub emulator
+
+ * Details are loaded from the .env file:
+
+   PUBSUB_EMULATOR_HOST=localhost:8085
+   PUBSUB_PROJECT_ID=test
