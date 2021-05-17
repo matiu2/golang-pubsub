@@ -3,15 +3,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
-	"strconv"
 	"sync"
 	"sync/atomic"
 
 	"cloud.google.com/go/pubsub"
 )
 
-func PublishMsgs(projectID string, topicID string, n int, done *sync.WaitGroup) {
+func PublishMsgs(projectID string, topicID string, messages []Message, done *sync.WaitGroup) {
 	defer done.Done()
 
 	ctx := context.Background()
@@ -25,9 +25,13 @@ func PublishMsgs(projectID string, topicID string, n int, done *sync.WaitGroup) 
 	var totalErrors uint64
 	t := client.Topic(topicID)
 
-	for i := 0; i < n; i++ {
+	for i, msg := range messages {
+		bytes, err := json.Marshal(msg)
+		if err != nil {
+			log.Fatalf("Unable to convert outgoing message into json: %v", msg)
+		}
 		result := t.Publish(ctx, &pubsub.Message{
-			Data: []byte("Message " + strconv.Itoa(i)),
+			Data: bytes,
 		})
 
 		wg.Add(1)
@@ -49,6 +53,6 @@ func PublishMsgs(projectID string, topicID string, n int, done *sync.WaitGroup) 
 	wg.Wait()
 
 	if totalErrors > 0 {
-		log.Fatalf("%d of %d messages did not publish successfully", totalErrors, n)
+		log.Fatalf("%d of %d messages did not publish successfully", totalErrors, len(messages))
 	}
 }

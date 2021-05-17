@@ -30,8 +30,10 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
+	messages := GenerateTestMessages(10)
+
 	go PullMsgs(projectID, subID, &wg)
-	go PublishMsgs(projectID, topicID, 10, &wg)
+	go PublishMsgs(projectID, topicID, messages, &wg)
 
 	log.Printf("Waiting for all the messages")
 	wg.Wait()
