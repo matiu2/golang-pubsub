@@ -52,7 +52,8 @@ func ensureTopic(client *pubsub.Client, projectID, topicID string) {
 	topic := client.Topic(topicID)
 
 	// Create the topic if needed
-	if topic == nil {
+	exists, err := topic.Exists(ctx)
+	if !exists || err != nil {
 		t, err := client.CreateTopic(ctx, topicID)
 		if err != nil {
 			// Probably it already exists, so just log it and return
