@@ -2,7 +2,7 @@
 package main
 
 import (
-	"fmt"
+	"math/rand"
 	"time"
 )
 
@@ -13,14 +13,18 @@ type Message struct {
 	Timestamp   time.Time `json:"timestamp"`
 }
 
-/// Generates `n` random messages
+/// Generates `n` randomish messages
 func GenerateTestMessages(n int) []Message {
+	severities := []string{"debug", "info", "warn", "error"}
+	services := []string{"superman", "batman", "wonder woman", "captain kangaroo", "mister incredible"}
+	payloads := []string{"flies", "jumps", "shoots", "smiles", "eats"}
+	rand.Seed(time.Now().Unix())
 	var out []Message
 	for i := 0; i < n; i++ {
 		msg := Message{
-			ServiceName: fmt.Sprintf("Service %d", i),
-			Payload:     fmt.Sprintf("Payload %d", i),
-			Severity:    fmt.Sprintf("Severity %d", i),
+			ServiceName: services[rand.Intn(len(services))],
+			Payload:     payloads[rand.Intn(len(payloads))],
+			Severity:    severities[rand.Intn(len(severities))],
 			Timestamp:   time.Now(),
 		}
 		out = append(out, msg)

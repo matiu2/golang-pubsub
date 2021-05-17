@@ -1,10 +1,12 @@
 # Development environment build instructions
 
+## Environment variables
+
+There's a .env file included in the repo with some nice default values for enviroment variables and their descriptions. This will be loaded by the app and the docker integration test system unless overriden in the cli.
 ## Pre-requisites
 
     * [go](https://golang.org/)
     * [docker-compose](https://docs.docker.com/compose/)
-
 ## Directory setup
 
 After download from github run:
