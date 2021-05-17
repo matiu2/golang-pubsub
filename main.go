@@ -8,10 +8,9 @@ import (
 
 	"cloud.google.com/go/pubsub"
 	"github.com/joho/godotenv"
-	"google.golang.org/api/iterator"
 )
 
-func pullMsgs(projectID, subID string) {
+func pullMsgs(projectID string, sub *pubsub.Subscription) {
 	ctx := context.Background()
 	client, err := pubsub.NewClient(ctx, projectID)
 	if err != nil {
@@ -19,12 +18,12 @@ func pullMsgs(projectID, subID string) {
 	}
 	defer client.Close()
 
-	log.Printf("Listening for messages: %s - %s", projectID, subID)
+	log.Printf("Listening for messages: %s - %v", projectID, sub)
 
 	// Consume 10 messages.
 	var mu sync.Mutex
 	received := 0
-	sub := client.Subscription(subID)
+	// sub := client.Subscription(subID)
 	cctx, cancel := context.WithCancel(ctx)
 	err = sub.Receive(cctx, func(ctx context.Context, msg *pubsub.Message) {
 		mu.Lock()
@@ -46,23 +45,8 @@ func pullMsgs(projectID, subID string) {
 func ensureTopic(client *pubsub.Client, projectID, topicID string) *pubsub.Topic {
 	ctx := context.Background()
 
-	// List the topics in case our topic already exists
-	var topic *pubsub.Topic
-	it := client.Topics(ctx)
-	for {
-		t, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Fatalf("While listing topics: Next: %v", err)
-		}
-		log.Printf("Listing topic: %s", t.ID())
-		if t.ID() == topicID {
-			topic = t
-			break
-		}
-	}
+	// See if our topic already exists
+	topic := client.Topic(topicID)
 
 	// Create the topic if needed
 	if topic == nil {
@@ -71,8 +55,10 @@ func ensureTopic(client *pubsub.Client, projectID, topicID string) *pubsub.Topic
 			// Probably it already exists, so just log it and return
 			log.Printf("Error creating topic: %v", err)
 		}
-		log.Printf("Topic created: %v\n", t)
 		topic = t
+		log.Printf("Topic created: %v\n", topic)
+	} else {
+		log.Printf("Topic found: %v\n", topic)
 	}
 
 	return topic
@@ -82,23 +68,7 @@ func ensureSubscription(client *pubsub.Client, topic *pubsub.Topic, subID string
 	ctx := context.Background()
 
 	// List the subscriptions in case it's already there
-	var sub *pubsub.Subscription
-	it := client.Subscriptions(ctx)
-	for {
-		s, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Fatalf("While listing subscriptions: Next: %v", err)
-		}
-		log.Printf("Listing subscriptions: %s", s.ID())
-		if s.ID() == subID {
-			sub = s
-			break
-		}
-	}
-
+	sub := client.Subscription(subID)
 	if sub == nil {
 		// Create the subscription
 		s, err := client.CreateSubscription(ctx, subID, pubsub.SubscriptionConfig{
@@ -110,7 +80,9 @@ func ensureSubscription(client *pubsub.Client, topic *pubsub.Topic, subID string
 			log.Printf("Error creating subscription: %v", err)
 		}
 		sub = s
-		log.Printf("Subscription created: %v\n", sub)
+		log.Printf("Subscription created: %v", sub)
+	} else {
+		log.Printf("Subscrition found: %v", sub)
 	}
 
 	return sub
@@ -124,7 +96,6 @@ func main() {
 
 	// Create the pubsub client
 	ctx := context.Background()
-	log.Printf("Creating topic: %s - %s", projectID, topicID)
 	client, err := pubsub.NewClient(ctx, projectID)
 	if err != nil {
 		log.Fatalf("pubsub.NewClient: %v", err)
@@ -135,6 +106,5 @@ func main() {
 	topic := ensureTopic(client, projectID, topicID)
 	subscription := ensureSubscription(client, topic, subID)
 
-	log.Printf("Have subscription: %v", subscription)
-	//pullMsgs(projectID, topicID)
+	pullMsgs(projectID, subscription)
 }

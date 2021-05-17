@@ -7,3 +7,4 @@
  - Work. Cleaning up baby vomit. Coffee.
 
  * 19:19 - Started looking at https://www.zakariaamine.com/2020-04-04/testing-gcp-pusub-golang
+ * 20:42 - I got the code to create a topic and a subscription
