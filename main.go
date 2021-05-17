@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"os"
 	"strconv"
@@ -29,9 +30,6 @@ func main() {
 	EnsureTopic(client, projectID, topicID)
 	EnsureSubscription(client, topicID, subID)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-
 	/// How many messages should we post to the database in one batch ?
 	batch_size_orig := os.Getenv("BATCH_SIZE")
 	batch_size, err := strconv.Atoi(batch_size_orig)
@@ -46,32 +44,86 @@ func main() {
 		log.Fatalf("Unable to parse an int from env var: FLUSH_PERIOD: %s, %v", flush_period_orig, err)
 	}
 
+	/// How many batches of messages to make/send total
+	batches_to_send_orig := os.Getenv("BATCHES_TO_SEND")
+	batches_to_send, err := strconv.Atoi(batches_to_send_orig)
+	if err != nil {
+		log.Fatalf("Unable to parse an int from env var: BATCHES_TO_SEND: %s, %v", batches_to_send_orig, err)
+	}
+
 	/// How many batches to store in memory
 	buffer_count_orig := os.Getenv("BUFFER_COUNT")
 	buffer_count, err := strconv.Atoi(buffer_count_orig)
 	if err != nil {
 		log.Fatalf("Unable to parse an int from env var: BUFFER_COUNT: %s, %v", buffer_count_orig, err)
 	}
-	messages := GenerateTestMessages(batch_size * buffer_count)
 
-	/// Make a 1000 batches of messages to send
-	max := batch_size * 1000
+	/// How many msecs to delay between sending messages
+	publish_delay_orig := os.Getenv("PUBLISH_DELAY_MSECS")
+	publish_delay, err := strconv.Atoi(publish_delay_orig)
+	if err != nil {
+		log.Fatalf("Unable to parse an int from env var: PUBLISH_DELAY_MSECS: %s, %v", publish_delay_orig, err)
+	}
+
+	/// Make some batches of messages to send
+	messages := GenerateTestMessages(batch_size * batches_to_send)
 
 	// A channel for the pubsub puller to push to the database flusher
 	// Allow up to 1000 batches before we stop accepting messages from pub sub
-	batches := make(chan []Message, 1000)
-	var quit_flusher chan *sync.WaitGroup
+	batches := make(chan []Message, buffer_count)
 
-	go PullMsgs(projectID, subID, max, batch_size, batches, &wg)
-	go PeriodicPublish(projectID, topicID, messages, &wg)
-	go PeriodicFlush(batches, int64(flush_period), quit_flusher)
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	go PullMsgs(projectID, subID, len(messages), batch_size, batches, &wg)
+	go PublishMsgs(projectID, topicID, messages, int64(publish_delay), &wg)
+	go PeriodicFlush(batches, int64(flush_period), len(messages), &wg)
 
 	log.Printf("Waiting for all the messages")
 	wg.Wait()
 
-	// Send a quit to the Periodic flusher and wait for that too
-	wg.Add(1)
-	quit_flusher <- &wg
-	wg.Wait()
+	// Now check the database
 
+	// Connect to the database
+	log.Printf("Checking the database")
+	db, err := sql.Open("mysql", "root:root@tcp(localhost:3307)/pubsub")
+	if err != nil {
+		log.Fatalf("Unable to connect to the database: %v", err)
+	}
+
+	// See how many superman info messages there are
+	rows, err := db.Query("Select count(1) from service_logs where service_name = ? and severity = ?", "superman", "debug")
+	if err != nil {
+		log.Fatalf("Unable to read supermans from DB: %v", err)
+	}
+	count := 0
+	if rows.Next() {
+		err = rows.Scan(&count)
+		if err != nil {
+			log.Fatalf("Unable to count supermans from DB: %v", err)
+		}
+	} else {
+		log.Fatal("No supermans found in the DB")
+	}
+
+	// Make sure that matches up with the reports table
+	rows, err = db.Query("select count from service_severity where service_name = ? and severity = ?", "superman", "debug")
+	if err != nil {
+		log.Fatalf("Unable to read superman summary from DB: %v", err)
+	}
+	new_count := 0
+	if rows.Next() {
+		err = rows.Scan(&new_count)
+		if err != nil {
+			log.Fatalf("Unable to check count supermans from DB: %v", err)
+		}
+	} else {
+		log.Fatal("No supermans found in the report table in the DB")
+	}
+
+	if count != new_count {
+		log.Fatalf("Wrong number supermans. Counted %d but status table had %d", count, new_count)
+	} else {
+		log.Printf("Everything worked as expected; We see %d superman debugs", count)
+	}
 }

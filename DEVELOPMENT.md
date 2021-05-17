@@ -17,9 +17,16 @@ To download all the go modules.
 
 ## Integration testing
 
-To create the testing *mysql* and *pubsub-emulator* docker images:
+Presently to run one integration test:
 
-    docker-compose up -d
+  docker-compose down
+  go run .
+  docker-compose up -d
+
+TODO:
+
+ * Make the go program clear the database at the start
+ * Make a proper go integration test instead of it being the main program
 
 (see [docker-compose.yaml](docker-compose.yaml) for that configuration)
 

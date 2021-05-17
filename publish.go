@@ -7,11 +7,12 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"cloud.google.com/go/pubsub"
 )
 
-func PublishMsgs(projectID string, topicID string, messages []Message, done *sync.WaitGroup) {
+func PublishMsgs(projectID string, topicID string, messages []Message, publish_delay int64, done *sync.WaitGroup) {
 	defer done.Done()
 
 	ctx := context.Background()
@@ -21,11 +22,16 @@ func PublishMsgs(projectID string, topicID string, messages []Message, done *syn
 	}
 	defer client.Close()
 
+	// We'll push a message every `publish_delay` msecs
+	ticker := time.NewTicker(time.Duration(publish_delay) * time.Millisecond)
+
 	var wg sync.WaitGroup
 	var totalErrors uint64
 	t := client.Topic(topicID)
 
 	for i, msg := range messages {
+		// Slow down a bit
+		<-ticker.C
 		bytes, err := json.Marshal(msg)
 		if err != nil {
 			log.Fatalf("Unable to convert outgoing message into json: %v", msg)
@@ -34,20 +40,14 @@ func PublishMsgs(projectID string, topicID string, messages []Message, done *syn
 			Data: bytes,
 		})
 
-		wg.Add(1)
-		go func(i int, res *pubsub.PublishResult) {
-			defer wg.Done()
-			// The Get method blocks until a server-generated ID or
-			// an error is returned for the published message.
-			id, err := res.Get(ctx)
-			if err != nil {
-				// Error handling code can be added here.
-				log.Printf("Failed to publish: %v", err)
-				atomic.AddUint64(&totalErrors, 1)
-				return
-			}
-			log.Printf("Published message %d; msg ID: %v\n", i, id)
-		}(i, result)
+		id, err := result.Get(ctx)
+		if err != nil {
+			// Error handling code can be added here.
+			log.Printf("Failed to publish: %v", err)
+			atomic.AddUint64(&totalErrors, 1)
+			return
+		}
+		log.Printf("Published message %d; msg ID: %v\n", i, id)
 	}
 
 	wg.Wait()

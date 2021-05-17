@@ -13,6 +13,10 @@ import (
 /// Saves a batch of messages to the database
 func SaveMessageBatch(messages []Message) {
 
+	if len(messages) == 0 {
+		return
+	}
+
 	log.Printf("Saving %d messages", len(messages))
 	// Connect to the database
 	db, err := sql.Open("mysql", "root:root@tcp(localhost:3307)/pubsub")
@@ -70,22 +74,20 @@ func SaveMessageBatch(messages []Message) {
 
 /// Calls SaveMessages every minute
 /// Every `period` seconds calls Save Messages - passing the batch channel, so it'll save all batches
-func PeriodicFlush(batches <-chan []Message, period int64, quitter chan *sync.WaitGroup) {
+/// Stops once it has saved 'max' messages
+func PeriodicFlush(batches <-chan []Message, period int64, max int, wg *sync.WaitGroup) {
+	defer wg.Done()
 	ticker := time.NewTicker(time.Duration(period) * time.Second)
-	for {
-		select {
-		// A period of waiting has finshed; save the batches
-		case <-ticker.C:
-			for batch := range batches {
-				SaveMessageBatch(batch)
-			}
-		// If we need to end, flush any extra batches, then return
-		case wg := <-quitter:
-			defer wg.Done()
-			for batch := range batches {
-				SaveMessageBatch(batch)
-			}
-			return
+	count := 0
+	for batch := range batches {
+		// Wait for a bit
+		<-ticker.C
+		// Process the batch
+		count += len(batch)
+		SaveMessageBatch(batch)
+		// Exit if we're done
+		if count == max {
+			break
 		}
 	}
 }

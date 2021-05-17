@@ -52,6 +52,7 @@ func PullMsgs(projectID, subID string, max int, batch_size int, out chan<- []Mes
 
 		// Once we've received the max messages, fire off one more batch then exit
 		if received == max {
+			log.Printf("Maximum messages (%d) have bee pulled", max)
 			out <- batch
 			cancel()
 		}
@@ -59,4 +60,6 @@ func PullMsgs(projectID, subID string, max int, batch_size int, out chan<- []Mes
 	if err != nil {
 		log.Fatalf("Receive: %v", err)
 	}
+
+	log.Print("PULLER EXITING")
 }
