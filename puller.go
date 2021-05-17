@@ -1,3 +1,5 @@
+/// pubsub message puller
+
 package main
 
 import (

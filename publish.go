@@ -1,3 +1,4 @@
+/// pubsub message publisher - used for integration testing
 package main
 
 import (

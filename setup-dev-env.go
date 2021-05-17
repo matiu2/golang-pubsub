@@ -1,3 +1,4 @@
+/// Use this to set up a new pubsub server - it'll create the topic and subscription so you can start sending messages
 package main
 
 import (
