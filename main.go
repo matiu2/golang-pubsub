@@ -71,7 +71,8 @@ func ensureSubscription(client *pubsub.Client, topicID, subID string) {
 
 	// List the subscriptions in case it's already there
 	sub := client.Subscription(subID)
-	if sub == nil {
+	exists, err := sub.Exists(ctx)
+	if !exists || err != nil {
 		// Create the subscription
 		s, err := client.CreateSubscription(ctx, subID, pubsub.SubscriptionConfig{
 			Topic:       client.Topic(topicID),
